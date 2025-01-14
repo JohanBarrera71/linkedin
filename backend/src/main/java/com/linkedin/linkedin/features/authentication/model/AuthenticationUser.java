@@ -1,11 +1,13 @@
 package com.linkedin.linkedin.features.authentication.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.linkedin.linkedin.features.feed.model.Post;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity(name = "users")
 public class AuthenticationUser {
@@ -24,12 +26,28 @@ public class AuthenticationUser {
     private String passwordResetToken = null;
     private LocalDateTime passwordResetTokenExpiryDate = null;
 
+    private String firstName = null;
+    private String lastName = null;
+    private String company = null;
+    private String position = null;
+    private String location = null;
+    private Boolean profileComplete = false;
+    private String profilePicture = null;
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Post> posts;
+
     public AuthenticationUser() {
     }
 
     public AuthenticationUser(String email, String password) {
         this.email = email;
         this.password = password;
+    }
+
+    private void updateProfileCompleteStatus(){
+        this.profileComplete = (this.firstName != null && this.lastName != null && this.company != null && this.position != null && this.location != null);
     }
 
     public Long getId() {
@@ -94,5 +112,74 @@ public class AuthenticationUser {
 
     public void setPasswordResetTokenExpiryDate(LocalDateTime passwordResetTokenExpiryDate) {
         this.passwordResetTokenExpiryDate = passwordResetTokenExpiryDate;
+    }
+
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+        updateProfileCompleteStatus();
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+        updateProfileCompleteStatus();
+    }
+
+    public String getCompany() {
+        return company;
+    }
+
+    public void setCompany(String company) {
+        this.company = company;
+        updateProfileCompleteStatus();
+    }
+
+    public String getPosition() {
+        return position;
+    }
+
+    public void setPosition(String position) {
+        this.position = position;
+        updateProfileCompleteStatus();
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
+        updateProfileCompleteStatus();
+    }
+
+    public Boolean getProfileComplete() {
+        return profileComplete;
+    }
+
+    public void setProfileComplete(Boolean profileComplete) {
+        this.profileComplete = profileComplete;
+    }
+
+    public List<Post> getPosts() {
+        return posts;
+    }
+
+    public void setPosts(List<Post> posts) {
+        this.posts = posts;
+    }
+
+    public String getProfilePicture() {
+        return profilePicture;
+    }
+
+    public void setProfilePicture(String profilePicture) {
+        this.profilePicture = profilePicture;
     }
 }

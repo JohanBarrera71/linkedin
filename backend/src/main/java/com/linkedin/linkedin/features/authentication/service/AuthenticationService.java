@@ -7,6 +7,9 @@ import com.linkedin.linkedin.features.authentication.repository.AuthenticationUs
 import com.linkedin.linkedin.features.authentication.utils.EmailService;
 import com.linkedin.linkedin.features.authentication.utils.Encoder;
 import com.linkedin.linkedin.features.authentication.utils.JsonWebToken;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -24,6 +27,9 @@ public class AuthenticationService {
     private final Encoder encoder;
     private final JsonWebToken jsonWebToken;
     private final EmailService emailService;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public AuthenticationService(JsonWebToken jsonWebToken, Encoder encoder, AuthenticationUserRepository authenticationUserRepository, EmailService emailService) {
         this.jsonWebToken = jsonWebToken;
@@ -117,9 +123,9 @@ public class AuthenticationService {
     }
 
     // Password reset logic
-    public void sendPasswordResetToken(String email){
+    public void sendPasswordResetToken(String email) {
         Optional<AuthenticationUser> user = authenticationUserRepository.findByEmail(email);
-        if(user.isPresent()){
+        if (user.isPresent()) {
             String passwordResetToken = generateEmailVerificationToken();
             String hashedToken = encoder.encode(passwordResetToken);
             user.get().setPasswordResetToken(hashedToken);
@@ -127,30 +133,53 @@ public class AuthenticationService {
             authenticationUserRepository.save(user.get());
             String subject = "Password Reset";
             String body = String.format("""
-                    You requested a password reset.
-                    Enter this code to reset your password: %s. This code will expire in %s minutes.""",
+                            You requested a password reset.
+                            Enter this code to reset your password: %s. This code will expire in %s minutes.""",
                     passwordResetToken, durationInMinutes);
-            try{
+            try {
                 emailService.sendEmail(email, subject, body);
-            }catch (Exception e ){
+            } catch (Exception e) {
                 logger.info("Error while sending email: {}", e.getMessage());
             }
-        }else {
+        } else {
             throw new IllegalArgumentException("User not found.");
         }
     }
 
-    public void resetPassword(String email, String newPassword, String token){
+    public void resetPassword(String email, String newPassword, String token) {
         Optional<AuthenticationUser> user = authenticationUserRepository.findByEmail(email);
-        if(user.isPresent() && encoder.matches(token, user.get().getPasswordResetToken()) && !user.get().getPasswordResetTokenExpiryDate().isBefore(LocalDateTime.now())){
+        if (user.isPresent() && encoder.matches(token, user.get().getPasswordResetToken()) && !user.get().getPasswordResetTokenExpiryDate().isBefore(LocalDateTime.now())) {
             user.get().setPasswordResetToken(null);
             user.get().setPasswordResetTokenExpiryDate(null);
             user.get().setPassword(encoder.encode(newPassword));
             authenticationUserRepository.save(user.get());
         } else if (user.isPresent() && encoder.matches(token, user.get().getPasswordResetToken()) && user.get().getPasswordResetTokenExpiryDate().isBefore(LocalDateTime.now())) {
             throw new IllegalArgumentException("Password reset token expired.");
-        }else {
+        } else {
             throw new IllegalArgumentException("Password reset token failed.");
+        }
+    }
+
+    public AuthenticationUser updateUserProfile(Long userId, String firstName, String lastName, String company, String position, String location) {
+        AuthenticationUser user = authenticationUserRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found."));
+
+        if (firstName != null) user.setFirstName(firstName);
+        if (lastName != null) user.setLastName(lastName);
+        if (company != null) user.setCompany(company);
+        if (position != null) user.setPosition(position);
+        if (location != null) user.setLocation(location);
+
+        return authenticationUserRepository.save(user);
+    }
+
+    @Transactional
+    public void deleteUser(Long userId) {
+        AuthenticationUser user = entityManager.find(AuthenticationUser.class, userId);
+        if (user != null) {
+            entityManager.createNativeQuery("DELETE FROM posts_likes WHERE user_id = :userId")
+                    .setParameter("userId", userId)
+                    .executeUpdate();
+            authenticationUserRepository.deleteById(userId);
         }
     }
 }
